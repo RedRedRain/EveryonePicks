@@ -12,5 +12,11 @@ own instead.
 
 Settings are in Mod Options.
 
+Found a bug? Report it at https://github.com/RedRedRain/EveryonePicks/issues
+
+Please include your log from BepInEx\LogOutput.log. The game overwrites it every time it
+starts, so copy it out before relaunching. If the problem only hit one player, it is that
+player's log that is needed.
+
 Still called SimulPicks on Thunderstore because package names cannot be changed. In game it is
 EveryonePicks.
