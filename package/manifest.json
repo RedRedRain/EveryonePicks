@@ -1,0 +1,11 @@
+{
+    "name": "SimulPicks",
+    "version_number": "0.3.34",
+    "website_url": "",
+    "description": "Everyone picks their card at the same time instead of taking turns. Shows who has picked and who you're still waiting on.",
+    "dependencies": [
+        "BepInEx-BepInExPack_ROUNDS-5.4.1901",
+        "willis81808-UnboundLib-3.2.14",
+        "Pykess-ModdingUtils-0.4.8"
+    ]
+}

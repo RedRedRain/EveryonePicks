@@ -1,0 +1,33 @@
+# Build output
+bin/
+obj/
+*.dll
+*.pdb
+
+# Release artifacts live on Thunderstore, not here
+*.zip
+
+# Third-party code. compat/ holds 260 other people's mods downloaded for compatibility
+# testing, and the *-decomp/ folders hold decompiled game and mod code. Neither is ours to
+# redistribute, and together they are well over 300 MB.
+compat/
+decompiled/
+game-decomp/
+ref-decomp/
+self-decomp/
+backup-0.2.1/
+
+# Machine-specific build paths
+Local.props
+
+# Local working files
+icons/
+shots/
+*.log
+install-log*.txt
+.playwright-mcp/
+
+# Internal working notes and machine-specific dev scripts
+AUDIT-confirmed.md
+capture.ps1
+install-on-exit.ps1

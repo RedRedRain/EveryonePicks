@@ -1,0 +1,10 @@
+{
+    "name": "EPDiag",
+    "version_number": "1.0.0",
+    "website_url": "",
+    "description": "Private diagnostic logger. Records the round loop to its own file. Not a gameplay mod.",
+    "dependencies": [
+        "BepInEx-BepInExPack_ROUNDS-5.4.1901",
+        "willis81808-UnboundLib-3.2.14"
+    ]
+}

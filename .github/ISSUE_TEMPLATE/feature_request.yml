@@ -1,0 +1,17 @@
+name: Idea
+description: Suggest something the mod could do
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would that be better than how it works now?
+    validations:
+      required: false

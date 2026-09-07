@@ -1,0 +1,85 @@
+name: Bug report
+description: Something went wrong in a match
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The fields below are the ones that decide whether a bug can
+        actually be found, so please fill in what you can.
+
+  - type: input
+    id: version
+    attributes:
+      label: Mod version
+      description: Shown in your mod manager, or in the log as `Loading [EveryonePicks x.y.z]`.
+      placeholder: "0.3.34"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: who
+    attributes:
+      label: Who did it affect?
+      description: >
+        This matters more than it sounds. Most of these bugs happen on one machine and leave
+        no trace whatsoever on anyone else's.
+      options:
+        - One player only
+        - Everyone in the lobby
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: everyone_has_it
+    attributes:
+      label: Did every player in the lobby have the mod, on the same version?
+      options:
+        - "Yes"
+        - "No"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        Attach `BepInEx\LogOutput.log` by dragging the file into this box.
+
+        **The game overwrites this file every time it starts**, so copy it out before
+        relaunching or it is lost.
+
+        **If only one player was affected, it is that player's log that is needed.** If several
+        of you saw it, attach both. Two views of the same match is usually what makes the cause
+        obvious.
+    validations:
+      required: false
+
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other mods
+      description: >
+        A list, or a screenshot of your mod manager. Plenty of these problems turn out to be
+        an interaction with another mod rather than this one.
+    validations:
+      required: false
+
+  - type: input
+    id: players
+    attributes:
+      label: How many players, and which game mode?
+      placeholder: "2 players, Team Deathmatch"
+    validations:
+      required: false
