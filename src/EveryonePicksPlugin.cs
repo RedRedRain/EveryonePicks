@@ -22,7 +22,7 @@ namespace EveryonePicks
     {
         public const string ModId = "com.redredrain.rounds.simulpicks";
         public const string ModName = "EveryonePicks";
-        public const string Version = "0.3.34";
+        public const string Version = "0.3.35";
 
         public static EveryonePicksPlugin Instance;
 

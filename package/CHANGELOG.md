@@ -1,3 +1,8 @@
+v0.3.35
+---
+
+- Added a link to the bug tracker, where you can now report problems.
+
 v0.3.34
 ---
 
