@@ -9,25 +9,16 @@ using UnityEngine;
 namespace EveryonePicks
 {
     /// <summary>
-    /// Keeps a match alive when somebody quits.
+    /// Keeps a match alive when a transition throws.
     ///
-    /// RoundsWithFriends sizes its round-counter and point-visualiser arrays from the team count,
-    /// and does not resize them when a player leaves. The next transition then throws, and because
-    /// a Unity coroutine stops dead at an exception, the rest of the transition never runs:
+    /// RWF sizes its round-counter and point-visualiser arrays from the team count and never
+    /// shrinks them, so after a leaver ShowRoundCounterSmall throws IndexOutOfRange. That call
+    /// sits between battleOngoing = true and StartCoroutine(DoPointStart()) in PointTransition,
+    /// and an exception ends a coroutine, so DoPointStart never runs and SetPlayersSimulated(true)
+    /// never happens. Guns fire and players move (client-side input) but nothing is simulated.
     ///
-    ///     PointTransition:
-    ///         GameManager.instance.battleOngoing = true;
-    ///         UIHandler.instance.ShowRoundCounterSmall(...);   &lt;- IndexOutOfRange after a leaver
-    ///         StartCoroutine(DoPointStart());                  &lt;- never reached
-    ///
-    /// DoPointStart is what ends with SetPlayersSimulated(true), so the round never really starts.
-    /// battleOngoing was already true, so guns fire, and movement is client-side input, which is
-    /// why the lobby looks alive while nothing takes damage.
-    ///
-    /// Two layers here. First, the fragile bookkeeping calls are wrapped so an exception in
-    /// cosmetic UI can no longer abort a transition. Second, a watchdog force-starts the round if
-    /// a transition dies anyway, for causes we have not seen yet. A wrong round counter is a far
-    /// better outcome than a dead match.
+    /// Two layers: finalizers on the fragile cosmetic calls, plus a watchdog that force-starts
+    /// the round if a transition dies for some other reason.
     /// </summary>
     internal static class LeaverResilience
     {
@@ -35,12 +26,9 @@ namespace EveryonePicks
         private static float deadline;
         private static bool firedThisRound;
 
-        // ---- phase watchdog ----
-        // The round-start watchdog above is armed by the PickEnd hook, so it can only ever help a
-        // client that GOT to the end of its pick phase. A client that dies DURING the phase never
-        // arms it and is stranded for good while everyone else plays on. This second watchdog is
-        // therefore driven purely by Update and wall-clock time, and depends on no hook, no RPC
-        // and no coroutine of ours - all of which are things that can be the very thing that broke.
+        // The round-start watchdog above arms on PickEnd, so it cannot help a client that dies
+        // DURING a phase. This one runs off Update and wall-clock time only: no hook, RPC or
+        // coroutine of ours, any of which could be what broke.
         private static bool phaseSeen;
         private static float phaseSince;
         private static float desyncSince;
@@ -174,15 +162,9 @@ namespace EveryonePicks
         }
 
         /// <summary>
-        /// Rescues a client left behind by its own pick phase. Two ways in:
-        ///
-        /// 1. A definite desync - the battle is running while we still believe we are picking.
-        ///    Everyone else has moved on, so there is nothing to wait for and we act quickly.
-        /// 2. A phase that simply never ends, as a slow backstop, in case the desync signal
-        ///    itself is unavailable.
-        ///
-        /// Both end in HardReset, which tears our own state down and hands the game back, then
-        /// the round-start recovery runs so the player is not left standing in a dead map.
+        /// Rescues a client stuck in its own pick phase. Triggers on a definite desync (battle
+        /// running while still picking) after DesyncGrace, or on StuckPhaseGrace as a backstop.
+        /// Both hard-reset local state, then arm the round-start recovery.
         /// </summary>
         private static void TickPhaseWatchdog()
         {

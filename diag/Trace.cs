@@ -9,16 +9,12 @@ namespace EPDiag
     /// <summary>
     /// Instruments every step of the round loop.
     ///
-    /// The problem this exists to solve: a client stops advancing rounds and NOTHING is logged,
-    /// by any mod, so all we can say afterwards is "it stopped somewhere". Silence is not
-    /// evidence. Patching each step to announce itself turns that silence into a precise last
-    /// known position.
+    /// When a client stops advancing rounds, no mod logs anything, so the only evidence is
+    /// silence. Patching each step to announce itself gives a precise last known position.
     ///
-    /// Most of these methods are COROUTINES, which matters enormously. A prefix on a coroutine
-    /// only tells you it was asked for, not that it ran, and a coroutine that dies halfway
-    /// through leaves no trace at all - which is exactly the failure we are chasing. So the
-    /// returned enumerator is wrapped and each step counted, giving us "died on step 7 of
-    /// PointTransition" instead of "PointTransition was called".
+    /// Most of these are coroutines. A prefix only proves one was requested, and a coroutine that
+    /// dies partway leaves no trace, so the returned enumerator is wrapped and its steps counted:
+    /// "died on step 7 of PointTransition" rather than "PointTransition was called".
     /// </summary>
     internal static class Trace
     {

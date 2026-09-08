@@ -8,14 +8,10 @@ namespace EPDiag
     /// <summary>
     /// Writes to its own file, not the BepInEx log.
     ///
-    /// Two reasons. BepInEx truncates LogOutput.log on every launch, so restarting the game after
-    /// a problem destroys the only record of it - that has already cost us one investigation. And
-    /// the shared log is drowning in thousands of unrelated exceptions from other mods, which
-    /// makes the round-loop sequence almost impossible to read.
-    ///
-    /// One file per launch, named for the moment it started, so nothing ever overwrites anything.
-    /// Every line is flushed immediately: if the game hard-crashes or is killed, the last line
-    /// before it died is the most valuable line in the file and must not be sitting in a buffer.
+    /// BepInEx truncates LogOutput.log on every launch, so restarting after a problem destroys
+    /// the record of it, and the shared log carries thousands of unrelated exceptions from other
+    /// mods. One file per launch, named for its start time, so nothing is overwritten. Flushed
+    /// per line, because the last line before a crash is usually the one that matters.
     /// </summary>
     internal static class Log
     {

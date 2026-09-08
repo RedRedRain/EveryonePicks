@@ -14,14 +14,12 @@ namespace EveryonePicks
     /// nothing more than a list of (player, card name). So it can be exercised with invented
     /// data, and does not need three clients and two sleeping friends to check.
     ///
-    /// The sim borrows real mod state (phaseActive, entitlements) so the reveal and the WAITING
-    /// banner behave as they would in a match. Giving that state back is not optional: a stuck
-    /// phaseActive would leave every interception in Patches believing a pick phase is running
-    /// for the rest of the session. So the restore does NOT live only in the coroutine's finally.
-    /// Unity does not reliably run a finally for a coroutine killed by StopCoroutine, so pressing
-    /// F10 mid-run could strand it, and the next run would then save the fake state as though it
-    /// were real and write it back for good. The restore is idempotent, runs before every new
-    /// trigger, and a watchdog catches a run that dies some other way.
+    /// It borrows real state (phaseActive, entitlements) so the reveal and banner behave as they
+    /// do in a match, and has to give it back: a stuck phaseActive makes every interception in
+    /// Patches think a phase is running. Unity does not reliably run a coroutine finally block on
+    /// StopCoroutine, so pressing F10 mid-run would strand the restore and the next run would save
+    /// the fake state as real. Hence an idempotent restore, run before every trigger, plus a
+    /// watchdog.
     ///
     /// Offline or single-player only.
     /// </summary>

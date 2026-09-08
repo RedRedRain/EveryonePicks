@@ -312,27 +312,14 @@ namespace EveryonePicks
             st.lastUpdate = Time.realtimeSinceStartup;
         }
 
-        /// <summary>
-        /// RoundsWithFriends resolves the whole pick order immediately after the PickStart hook,
-        /// then walks it one player at a time - each iteration costing a network WaitForSyncUp,
-        /// a hook chain and a 0.1s wait. Entitlements therefore trickled in over seconds, the
-        /// board filled a row at a time, and (worse) your own pick did not begin until the loop
-        /// reached you, which is the opposite of simultaneous.
-        ///
-        /// Reading the resolved order lets us register every picker at once and start the local
-        /// player's session immediately, while RWF's loop plays out harmlessly behind it.
-        /// </summary>
-        /// <summary>
-        /// Last line of defence for the failure that stranded a client for a whole match: we are
-        /// entitled to a pick, but no session was ever queued for it, so we sit doing nothing
-        /// while everyone waits on us and then plays on without us.
-        ///
-        /// Ownership resolving late is the known cause and is fixed in IsLocalPlayer, but the
-        /// consequence is bad enough - an unplayable game with no way back - that it is worth
-        /// catching regardless of how it happens. Latched per token so it can only fire once.
-        /// </summary>
+        /// <summary>Phase token the reconciler has already run for.</summary>
         private static int reconciledToken = -1;
 
+        /// <summary>
+        /// Starts our pick if we are entitled to one but no session was ever queued. Late owner
+        /// resolution is the known cause (see IsLocalPlayer); this catches it however it happens,
+        /// since the alternative is an unplayable match. Once per phase token.
+        /// </summary>
         internal static void ReconcileLocalPick()
         {
             if (!phaseActive || waitingOver) return;
@@ -365,6 +352,12 @@ namespace EveryonePicks
             catch (Exception e) { EveryonePicksPlugin.Warn("Pick reconcile failed: " + e.Message); }
         }
 
+        /// <summary>
+        /// Registers every picker at once from RWF's resolved order and starts the local session
+        /// immediately. RWF otherwise walks the order one player at a time, each step costing a
+        /// WaitForSyncUp, a hook chain and 0.1s, so your own pick only began when the loop reached
+        /// you. Its loop still runs behind this, harmlessly.
+        /// </summary>
         internal static void SeedPickers(List<Player> order)
         {
             if (!phaseActive || order == null || order.Count == 0) return;
