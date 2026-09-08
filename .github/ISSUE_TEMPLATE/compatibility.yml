@@ -1,11 +1,11 @@
 name: Mod compatibility
-description: Another mod's card or feature misbehaves with EveryonePicks
+description: Another mod's card doesn't work right with this
 labels: ["compatibility"]
 body:
   - type: input
     id: mod
     attributes:
-      label: Which mod, and which card or feature?
+      label: Which mod and which card
       placeholder: "WillsWackyManagers - Reroll"
     validations:
       required: true
@@ -14,17 +14,7 @@ body:
     id: what
     attributes:
       label: What it does wrong
-      description: >
-        Especially useful: does it work correctly for the person who picked it but not for
-        everyone else, or is it wrong for everybody?
-    validations:
-      required: true
-
-  - type: input
-    id: version
-    attributes:
-      label: EveryonePicks version
-      placeholder: "0.3.34"
+      description: Does it work for the person who picked it but not for everyone else?
     validations:
       required: true
 
@@ -32,8 +22,6 @@ body:
     id: log
     attributes:
       label: Log
-      description: >
-        `BepInEx\LogOutput.log` from the player who picked the card. It is overwritten on every
-        launch, so copy it out before restarting.
+      description: "`BepInEx\LogOutput.log` from whoever picked the card."
     validations:
       required: false

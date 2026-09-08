@@ -1,6 +1,6 @@
 {
     "name": "SimulPicks",
-    "version_number": "0.3.35",
+    "version_number": "0.3.36",
     "website_url": "https://github.com/RedRedRain/EveryonePicks",
     "description": "Everyone picks their card at the same time instead of taking turns. Shows who has picked and who you're still waiting on.",
     "dependencies": [

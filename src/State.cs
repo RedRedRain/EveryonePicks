@@ -75,13 +75,9 @@ namespace EveryonePicks
         internal static bool startingOwnSession;
 
         /// <summary>
-        /// Non-zero only while the game is spawning a DRAFT CARD.
-        ///
-        /// The instantiate redirect used to apply to the entire session, so anything a card
-        /// effect created while the pick was open - a sword, an AI minion, any gameplay object -
-        /// was made local-only, given a ViewID no other client had, and then destroyed by
-        /// CleanupLocalCards at teardown. Whole mods were silently dead. Nesting-safe because
-        /// card spawns can re-enter.
+        /// Non-zero only while a draft card is being spawned. The instantiate redirect used to
+        /// cover the whole session, so swords, minions and anything else a card spawned were made
+        /// local-only and destroyed at teardown. Counted, since card spawns can re-enter.
         /// </summary>
         internal static int cardSpawnDepth;
 
@@ -216,17 +212,10 @@ namespace EveryonePicks
         }
 
         /// <summary>
-        /// Whether this player is us.
-        ///
-        /// `view.Owner` is resolved from Photon's player list and is NULL for a short window after
-        /// a view appears. SeedPickers runs the instant RWF resolves the pick order, which lands
-        /// inside that window often enough to matter, and the old check read a null Owner as
-        /// "not us". The client then seeded everyone's entitlements, queued a pick for nobody, and
-        /// waited forever: no cards, nothing ever reported, and the host continuing without it
-        /// after the budget expired. Once seededThisPhase latched there was no second chance.
-        ///
-        /// OwnerActorNr is a plain int carried on the view itself, so it is right even while the
-        /// Owner object is still null. It is the answer; Owner is only the fallback.
+        /// `view.Owner` is null for a window after a view appears, and SeedPickers runs the
+        /// instant RWF resolves the order, so a null Owner used to read as "not us": the client
+        /// queued a pick for nobody and waited forever. OwnerActorNr is a plain int on the view
+        /// and is correct even then, so prefer it; Owner is the fallback.
         /// </summary>
         internal static bool IsLocalPlayer(Player p)
         {
@@ -245,14 +234,8 @@ namespace EveryonePicks
         }
 
         /// <summary>
-        /// Whether this player is really gone.
-        ///
-        /// Asking the Player object is not good enough. RoundsWithFriends keeps the ROUNDS Player
-        /// alive after its Photon owner leaves a private lobby, so `view.Owner` stays non-null and
-        /// the old check answered "still here" forever. The barrier then waited on a player who
-        /// could never report, every round, until the budget expired.
-        ///
-        /// Photon's room roster is the authority on who is present.
+        /// RWF keeps the Player object alive after its Photon owner leaves, so `view.Owner` stays
+        /// non-null and is useless as a presence test. Use the room roster.
         /// </summary>
         internal static bool HasLeftRoom(Player p)
         {

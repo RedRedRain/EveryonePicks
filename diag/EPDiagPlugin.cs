@@ -9,14 +9,10 @@ using UnityEngine;
 namespace EPDiag
 {
     /// <summary>
-    /// A private diagnostic mod. It changes nothing about the game: it only watches and writes a
-    /// file, so it can be handed to a few players and taken away again without consequence.
+    /// Diagnostic mod. Changes nothing, just watches and writes a file.
     ///
-    /// It exists because the last two investigations both ended at the same wall - a client stops
-    /// advancing rounds, no mod logs anything, and the shared log is both overwritten on restart
-    /// and buried under thousands of unrelated exceptions. This produces one clean, timestamped
-    /// file per player per launch, so two players' files can be laid side by side and read as the
-    /// same story from two points of view.
+    /// For the case where a client stops advancing rounds and no mod logs anything. Writes one
+    /// timestamped file per player per launch so two players' files can be read side by side.
     /// </summary>
     [BepInPlugin(ModId, "EPDiag", Version)]
     [BepInProcess("Rounds.exe")]

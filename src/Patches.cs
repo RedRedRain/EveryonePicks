@@ -17,18 +17,10 @@ namespace EveryonePicks
     internal static class Patch_DoPick
     {
         /// <summary>
-        /// Every pick request that arrives while a phase is live becomes an entitlement, whoever
-        /// asked for it.
-        ///
-        /// 0.2.1 gated this on a whitelist of caller namespaces (RWF.GameModes, PickNCards,
-        /// GM_ArmsRace, GM_Test). WillsWackyManagers grants its extra picks from its own
-        /// PlayerPickEnd hook and matches none of them, so those picks fell through to a
-        /// sequential vanilla pass-through whose run-or-skip decision was an unsynchronised
-        /// local wall-clock compare. In a real six-player round that silently destroyed three of
-        /// five granted extra picks and stalled the phase for 60 seconds on a fourth.
-        ///
-        /// A whitelist can only know about the mods it was written against, so there isn't one
-        /// any more.
+        /// Any pick request during a live phase becomes an entitlement, whoever asked for it.
+        /// This was once gated on a whitelist of caller namespaces, but WWM grants extra picks
+        /// from its own hook and matched none of them, so they were silently dropped. A whitelist
+        /// only knows the mods it was written against.
         /// </summary>
         private static bool Prefix(int picksToSet, int picketIDToSet, PickerType pType,
                                    ref IEnumerator __result, bool __runOriginal)
@@ -80,18 +72,10 @@ namespace EveryonePicks
     }
 
     /// <summary>
-    /// Capture every card the player actually ACQUIRES during their session, not just the one the
-    /// pick UI reported.
-    ///
-    /// Capturing CardChoice.Pick only ever saw the single clicked card. A mod that hands the
-    /// player more cards during the same pick - Nulled Cards' Distill Acquisition sweeps the whole
-    /// remaining hand, for instance - routes each one through ApplyCardStats.Pick without ever
-    /// touching CardChoice.Pick. Those cards applied on the picker's machine and nowhere else,
-    /// because RPCA_Pick is localised while a session runs. Capturing here instead means anything
-    /// a player ends up holding gets into the apply-set, whichever mod granted it, with no
-    /// per-mod knowledge required.
-    ///
-    /// ApplyCardStats' own `done` flag guarantees exactly one record per card object.
+    /// Catches every card the player ends up with, not just the one the pick UI reported. Mods
+    /// that hand out extra cards mid-pick (Distill Acquisition and friends) go through
+    /// ApplyCardStats.Pick without touching CardChoice.Pick, so they used to apply locally only.
+    /// ApplyCardStats' own `done` flag keeps this to one record per card.
     /// </summary>
     [HarmonyPatch(typeof(ApplyCardStats), "Pick")]
     internal static class Patch_Pick_Capture

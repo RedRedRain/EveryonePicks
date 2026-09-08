@@ -11,14 +11,12 @@ namespace EveryonePicks
     /// <summary>
     /// Keeps a match alive when a transition throws.
     ///
-    /// RWF sizes its round-counter and point-visualiser arrays from the team count and never
-    /// shrinks them, so after a leaver ShowRoundCounterSmall throws IndexOutOfRange. That call
-    /// sits between battleOngoing = true and StartCoroutine(DoPointStart()) in PointTransition,
-    /// and an exception ends a coroutine, so DoPointStart never runs and SetPlayersSimulated(true)
-    /// never happens. Guns fire and players move (client-side input) but nothing is simulated.
+    /// RWF sizes its round-counter arrays from the team count and never shrinks them, so after a
+    /// leaver ShowRoundCounterSmall throws. It sits between battleOngoing = true and
+    /// StartCoroutine(DoPointStart()) in PointTransition, and an exception ends a coroutine, so
+    /// the round never really starts: guns fire and players move, but nothing is simulated.
     ///
-    /// Two layers: finalizers on the fragile cosmetic calls, plus a watchdog that force-starts
-    /// the round if a transition dies for some other reason.
+    /// Finalizers on the fragile cosmetic calls, plus a watchdog for transitions that die anyway.
     /// </summary>
     internal static class LeaverResilience
     {

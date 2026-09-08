@@ -7,17 +7,13 @@ using UnityEngine;
 namespace EveryonePicks
 {
     /// <summary>
-    /// Live pick reveal. As each player locks a card in, that card appears on everyone's screen
-    /// with the player above it, so the people who finished first watch the round fill in instead
-    /// of staring at a static board. Everything stays up briefly after the last pick, then clears.
+    /// Live pick reveal: each card appears as its player locks it in, with the player above it,
+    /// then clears shortly after the last pick. Replaces ModdingUtils' card-bar crawl, which fed
+    /// cards in one at a time after the phase and made the end of a round a queue again.
     ///
-    /// This replaces ModdingUtils' card-bar crawl, which fed cards into the side bar one at a
-    /// time after the phase and turned the end of a simultaneous round back into a queue.
-    ///
-    /// All of it is local presentation driven by RPCA_SimulResult, which every client already
-    /// receives. Nothing extra is networked. The card is the same Instantiate the pick UI uses,
-    /// and the player figure is a copy of that player's sprite renderers only - no scripts, no
-    /// PhotonView, no colliders - so it cannot interact with anything.
+    /// Local presentation only, driven by RPCA_SimulResult which every client already gets.
+    /// Nothing extra is networked. The figure is a copy of the player's sprite renderers with no
+    /// scripts, PhotonView or colliders, so it cannot interact with anything.
     /// </summary>
     internal static class PickReveal
     {

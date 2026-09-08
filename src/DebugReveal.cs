@@ -7,21 +7,14 @@ using UnityEngine;
 namespace EveryonePicks
 {
     /// <summary>
-    /// Fakes a full reveal on a solo machine so the visuals can be checked without a lobby.
+    /// Fakes a reveal on a solo machine so the visuals can be checked without a lobby. The whole
+    /// reveal is local presentation driven by a list of (player, card name), so invented data
+    /// works fine.
     ///
-    /// Everything the reveal draws - card size, the fan for a player with several picks, the
-    /// grid for a big lobby, layering, figures and name plates - is local presentation driven by
-    /// nothing more than a list of (player, card name). So it can be exercised with invented
-    /// data, and does not need three clients and two sleeping friends to check.
-    ///
-    /// It borrows real state (phaseActive, entitlements) so the reveal and banner behave as they
-    /// do in a match, and has to give it back: a stuck phaseActive makes every interception in
-    /// Patches think a phase is running. Unity does not reliably run a coroutine finally block on
-    /// StopCoroutine, so pressing F10 mid-run would strand the restore and the next run would save
-    /// the fake state as real. Hence an idempotent restore, run before every trigger, plus a
-    /// watchdog.
-    ///
-    /// Offline or single-player only.
+    /// Borrows phaseActive and entitlements, and must put them back: a stuck phaseActive makes
+    /// every interception in Patches think a phase is running. Unity does not reliably run a
+    /// coroutine finally on StopCoroutine, so pressing F10 mid-run would strand the restore.
+    /// Hence the idempotent restore plus a watchdog. Offline or single-player only.
     /// </summary>
     internal static class DebugReveal
     {

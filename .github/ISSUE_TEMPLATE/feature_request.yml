@@ -1,17 +1,10 @@
 name: Idea
-description: Suggest something the mod could do
+description: Suggest something
 labels: ["idea"]
 body:
   - type: textarea
     id: idea
     attributes:
-      label: What would you like it to do?
+      label: What should it do?
     validations:
       required: true
-
-  - type: textarea
-    id: why
-    attributes:
-      label: Why would that be better than how it works now?
-    validations:
-      required: false

@@ -58,19 +58,10 @@ namespace EveryonePicks
         }
 
         /// <summary>
-        /// otDan-PickTimer (and the PickTimerCompat shim bundled inside Root-PickPhaseImprovements)
-        /// auto-picks on a timer by indexing CardChoice.spawnedCards:
-        ///
-        ///     instance.Pick(spawnedCards[Random.Next(0, spawnedCards.Count)], false)
-        ///
-        /// EveryonePicks clears spawnedCards when it tears a local session down, so an in-flight timer
-        /// resumes against an empty list and throws ArgumentOutOfRangeException from inside the
-        /// coroutine. That kills the pick phase: no cards spawn for anyone, and 0.2.1's barrier then
-        /// silently no-opped for the rest of the match.
-        ///
-        /// Rather than merely warning (which 0.2.1 did, and nobody noticed), stop every timer-start
-        /// path from running while we own the pick phase. EveryonePicks provides its own per-player
-        /// timer, so no functionality is lost.
+        /// PickTimer auto-picks by indexing CardChoice.spawnedCards, which we clear when tearing
+        /// down a local session, so an in-flight timer hits an empty list and throws out of its
+        /// coroutine, killing the pick phase. Block every timer-start path while we own the
+        /// phase. We have our own per-player timer, so nothing is lost.
         /// </summary>
         private static void NeutralisePickTimer(Harmony h)
         {
