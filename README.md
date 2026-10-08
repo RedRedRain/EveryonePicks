@@ -8,6 +8,7 @@ A ROUNDS mod. Everyone picks their card at the same time instead of taking turns
 - Bottom left shows who's picked and who you're waiting on
 - Hover a player's cards to spread them out
 - Extra picks from other mods work
+- Nulled cards reach everyone, not just the player who picked one
 - Someone quitting won't kill the match
 
 ## Bugs

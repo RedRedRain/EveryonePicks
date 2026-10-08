@@ -98,7 +98,10 @@ namespace EveryonePicks
             CardInfo source = null;
             try { source = (CardInfo)F_sourceCard.GetValue(info); } catch { }
 
-            string name = source != null ? source.name : info.name.Replace("(Clone)", "");
+            // A nulled card cannot be named by its Unity object name - see SoftPatches.NullWireName.
+            string name = SoftPatches.NullWireName(source) ?? SoftPatches.NullWireName(info);
+            if (name == null)
+                name = source != null ? source.name : info.name.Replace("(Clone)", "");
             if (string.IsNullOrEmpty(name)) return;
 
             State.currentSessionPicks.Add(new ResultEntry

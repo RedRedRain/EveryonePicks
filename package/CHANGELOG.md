@@ -1,3 +1,10 @@
+v0.3.37
+---
+
+- Fixed nulled cards only existing on the screen of the player who picked one. Everyone now
+  sees the card and the nulls it spent, so anti-cards and reforges count the same for the
+  whole lobby.
+
 v0.3.36
 ---
 

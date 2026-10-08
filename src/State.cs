@@ -1164,7 +1164,7 @@ namespace EveryonePicks
             var player = FindPlayer(pid);
             if (player == null) return;
 
-            var info = FindCard(cardName);
+            var info = FindCard(cardName, pid);
             bool alreadyLocal = PhotonNetwork.OfflineMode || locallyProduced.Contains(pid + "|" + idx);
 
             if (!alreadyLocal)
@@ -1182,6 +1182,10 @@ namespace EveryonePicks
 
                 assign.Invoke(null, new object[] { cardName, pid, false, "", 0f, 0f, true });
 
+                // NullManager's prefix on that method files the card, but nothing on this client
+                // has spent the nulls it cost. See SoftPatches.ChargeNulls.
+                SoftPatches.ChargeNulls(player, info);
+
                 // The reveal shows every card at once; ModdingUtils' side-bar crawl is the thing
                 // it replaces, so only feed that when the reveal is off.
                 if (info != null && !EveryonePicksPlugin.ShowReveal.Value)
@@ -1194,8 +1198,15 @@ namespace EveryonePicks
                 SoftPatches.CursePlayer(player);
         }
 
-        internal static CardInfo FindCard(string objectName)
+        /// <summary>
+        /// Resolve a result's card name. <paramref name="playerID"/> is only consulted for null
+        /// cards, which NullManager builds per player; -1 asks for the ownerless copy.
+        /// </summary>
+        internal static CardInfo FindCard(string objectName, int playerID = -1)
         {
+            var nulled = SoftPatches.ResolveNullCard(objectName, playerID);
+            if (nulled != null) return nulled;
+
             var choice = CardChoice.instance;
             if (choice != null && choice.cards != null)
             {

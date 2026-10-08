@@ -56,7 +56,7 @@ namespace EveryonePicks
 
             try
             {
-                var info = State.FindCard(cardName);
+                var info = State.FindCard(cardName, playerID);
                 if (info == null) return;
 
                 var card = CardChoice.instance.AddCardVisual(info, Vector3.zero);
