@@ -186,8 +186,10 @@ namespace EveryonePicks
             observedPicks.Clear();
             seeded.Clear();
             seededThisPhase = false;
-            seededThisPhase = false;
             pendingApplySet = null;
+            pendingReport = null;
+            runGeneration++;
+            FollowUpPicks.Cancel();
             PickReveal.Cleanup();
             ReplayEarlyArrivals();
             yield break;
@@ -474,7 +476,22 @@ namespace EveryonePicks
 
         internal static void EnqueueLocalPick(int playerID, PickerType pType)
         {
-            localQueue.Enqueue(new KeyValuePair<int, PickerType>(playerID, pType));
+            var item = new KeyValuePair<int, PickerType>(playerID, pType);
+
+            if (FollowUpPicks.InReplayStep)
+            {
+                // A follow-up pick granted by the pick that just ended runs next, ahead of anyone
+                // else's, as it would in vanilla. Otherwise a second local player's session ran
+                // first and the follow-up missed the restricted pool its card set up for it.
+                var rest = localQueue.ToArray();
+                int at = Mathf.Min(FollowUpPicks.frontInserts++, rest.Length);
+                localQueue.Clear();
+                for (int i = 0; i < at; i++) localQueue.Enqueue(rest[i]);
+                localQueue.Enqueue(item);
+                for (int i = at; i < rest.Length; i++) localQueue.Enqueue(rest[i]);
+            }
+            else localQueue.Enqueue(item);
+
             if (runner == null)
                 runner = EveryonePicksPlugin.Instance.StartCoroutine(RunnerLoop());
         }
@@ -628,17 +645,24 @@ namespace EveryonePicks
         private static IEnumerator RunLocalNativePick(int playerID, PickerType pType)
         {
             int myToken = phaseToken;
+            int myGen = runGeneration;
             var choice = CardChoice.instance;
             if (choice == null) yield break;
 
             producedCount.TryGetValue(playerID, out int baseIdx);
             currentSessionPicks.Clear();
             localCards.Clear();
+            endPickCard = null;
+            forcedPickLock = false;
             currentSessionPlayer = playerID;
             localPickActive = true;
 
             try
             {
+                // Guarded so a lobby without follow-up mods starts its session this frame, as before.
+                if (FollowUpPicks.HasGranters("PlayerPickStart"))
+                    yield return FollowUpPicks.RunBeforeSession(myToken);
+
                 bool started = false;
                 try
                 {
@@ -669,8 +693,9 @@ namespace EveryonePicks
 
                     float deadline = Time.realtimeSinceStartup + PickSeconds * picksSeen;
                     bool forced = false;
+                    bool lastChance = false;
 
-                    while (SafeIsPicking(choice) && myToken == phaseToken)
+                    while (SafeIsPicking(choice) && myToken == phaseToken && myGen == runGeneration)
                     {
                         int picksNow = SafePicks(choice);
 
@@ -683,6 +708,7 @@ namespace EveryonePicks
                             deadline += PickSeconds * (picksNow - picksSeen);
                             picksSeen = picksNow;
                             forced = false;
+                            lastChance = false;
                             BroadcastStatus(myToken, playerID, picksNow, false);
                             EveryonePicksPlugin.Log("Extra pick(s) granted mid-session -> " + picksNow + " remaining.");
                         }
@@ -692,21 +718,35 @@ namespace EveryonePicks
                             picksSeen = picksNow;
                             deadline = Time.realtimeSinceStartup + PickSeconds;
                             forced = false;
+                            lastChance = false;
                             BroadcastStatus(myToken, playerID, Mathf.Max(picksNow, 0), false);
                         }
 
                         if (Time.realtimeSinceStartup > deadline)
                         {
-                            if (forced)
+                            if (forced && !lastChance)
+                            {
+                                // Still here 10s after the first expiry. A pick that was under way
+                                // would have finished by now, so a hand still flagged as busy is
+                                // stuck (a deal that threw half way): pick from it anyway, as
+                                // 0.3.36 always did, rather than leave the player with nothing.
+                                lastChance = true;
+                                ForceCompletePick(choice, stuck: true);
+                                deadline += 10f;
+                            }
+                            else if (forced)
                             {
                                 EveryonePicksPlugin.Warn("Session for player " + playerID + " stuck; abandoning.");
                                 break;
                             }
-                            // One force per pick, not one per session: a multi-pick hand needs to be
-                            // driven to completion, and the picks-changed branches above clear this.
-                            forced = true;
-                            ForceCompletePick(choice);
-                            deadline += 10f;
+                            else
+                            {
+                                // One force per pick, not one per session: a multi-pick hand needs to be
+                                // driven to completion, and the picks-changed branches above clear this.
+                                forced = true;
+                                ForceCompletePick(choice);
+                                deadline += 10f;
+                            }
                         }
                         yield return null;
                     }
@@ -736,7 +776,46 @@ namespace EveryonePicks
                 catch { }
             }
 
-            ReportSession(myToken, playerID, baseIdx, currentSessionPicks);
+            // StopCoroutine on the runner does not stop this routine, which Unity runs as a nested
+            // coroutine of its own. If the phase was torn down meanwhile, FlushRunner or HardReset
+            // has already reported (or discarded) this session.
+            if (myGen != runGeneration) yield break;
+
+            // Let cards that grant a follow-up pick act now that this one is over, BEFORE we
+            // report: the pick they grant has to be queued by the time we say whether we are done,
+            // or the barrier could close on it. See FollowUpPicks.
+            pendingReport = new SessionReport
+            {
+                token = myToken,
+                playerID = playerID,
+                baseIdx = baseIdx,
+                picks = new List<ResultEntry>(currentSessionPicks)
+            };
+            yield return FollowUpPicks.RunAfterSession(myToken);
+            if (myGen != runGeneration) yield break;
+            SendPendingReport();
+        }
+
+        /// <summary>Bumped whenever the local runner is torn down, so routines it left running stand down.</summary>
+        private static int runGeneration;
+
+        /// <summary>
+        /// A finished session's report, parked while follow-up hooks run. If the barrier stops
+        /// the runner meanwhile, FlushRunner sends it so the pick is not lost.
+        /// </summary>
+        private sealed class SessionReport
+        {
+            public int token, playerID, baseIdx;
+            public List<ResultEntry> picks;
+        }
+
+        private static SessionReport pendingReport;
+
+        private static void SendPendingReport()
+        {
+            var r = pendingReport;
+            pendingReport = null;
+            if (r != null) ReportSession(r.token, r.playerID, r.baseIdx, r.picks);
         }
 
         internal static void ReportSession(int token, int playerID, int baseIdx, List<ResultEntry> picks)
@@ -768,9 +847,6 @@ namespace EveryonePicks
 
             producedCount[playerID] = baseIdx + produced;
 
-            try { Broadcast("RPCA_SimulSessionDone", token, playerID, produced); }
-            catch (Exception e) { EveryonePicksPlugin.Warn("Session marker failed: " + e.Message); }
-
             // Do NOT announce "done" while this player still owes sessions. A queued session is
             // invisible to everyone else - nothing is broadcast until it actually starts - so
             // claiming done let the barrier close in the gap, and the queued pick then applied
@@ -778,6 +854,14 @@ namespace EveryonePicks
             int stillQueued = 0;
             foreach (var kv in localQueue) if (kv.Key == playerID) stillQueued++;
             if (localPickActive && currentSessionPlayer == playerID) stillQueued++;
+
+            // A follow-up pick queued by this session must be owed on the host BEFORE this
+            // session's marker lands there, or the host can see every session in and close the
+            // barrier between the two messages. The +1 is this session, not yet counted as done.
+            if (stillQueued > 0) BroadcastStatus(token, playerID, stillQueued + 1, false);
+
+            try { Broadcast("RPCA_SimulSessionDone", token, playerID, produced); }
+            catch (Exception e) { EveryonePicksPlugin.Warn("Session marker failed: " + e.Message); }
 
             BroadcastStatus(token, playerID, stillQueued, stillQueued == 0);
         }
@@ -797,6 +881,8 @@ namespace EveryonePicks
             try
             {
                 choice.StopAllCoroutines();
+                forcedPickLock = false;
+                endPickCard = null;
                 choice.IsPicking = false;
                 F_picks.SetValue(choice, 0);
                 F_isPlaying.SetValue(choice, false);
@@ -814,10 +900,20 @@ namespace EveryonePicks
             }
         }
 
-        internal static void ForceCompletePick(CardChoice choice)
+        internal static void ForceCompletePick(CardChoice choice, bool stuck = false)
         {
             try
             {
+                // The player beat the clock: their card is already on its way out, or the next
+                // hand is still being dealt. Picking now would hand them a second card, and two
+                // end-pick animations fighting over one card slot left it parked mid-screen.
+                // Once the session is known to be stuck, only a card actually leaving holds us off.
+                if (stuck ? StuckPickInFlight(choice) : PickInFlight(choice))
+                {
+                    EveryonePicksPlugin.Log("Pick time expired with a pick already under way; letting it finish.");
+                    return;
+                }
+
                 var list = ((List<GameObject>)F_spawnedCards.GetValue(choice))?.Where(g => g != null).ToList();
                 if (list == null || list.Count == 0)
                 {
@@ -827,12 +923,80 @@ namespace EveryonePicks
                 int idx = Mathf.Clamp((int)F_selected.GetValue(choice), 0, list.Count - 1);
                 EveryonePicksPlugin.Warn("Pick time expired - auto-picking selected card.");
                 choice.Pick(list[idx], false);
+
+                // Vanilla stops reading input once you pick; Pick() itself does not. Without this
+                // the player could still move along the hand and confirm a second card while the
+                // first was leaving. Held until that card has gone (see Patch_DoPlayerSelect_ForcedLock).
+                forcedPickLock = true;
             }
             catch (Exception e)
             {
                 EveryonePicksPlugin.Warn("Force-complete failed: " + e.Message);
                 try { choice.IsPicking = false; } catch { }
             }
+        }
+
+        /// <summary>The card the running end-pick animation is for.</summary>
+        private static GameObject endPickCard;
+
+        /// <summary>Our timer picked for the player; their input stays off until that card has gone.</summary>
+        internal static bool forcedPickLock;
+
+        /// <summary>Called as an end-pick starts in a local session, with the card being picked.</summary>
+        internal static void NoteEndPick(GameObject picked) => endPickCard = picked;
+
+        /// <summary>
+        /// True while the card an end-pick started for is still in the hand. Vanilla keeps it
+        /// there until the animation ends; mods that keep the rest of the hand open (Select Any
+        /// Number) take out just that card. Compared by reference: the card can be destroyed
+        /// before the list lets go of it.
+        /// </summary>
+        internal static bool EndPickInFlight(CardChoice choice)
+        {
+            if ((object)endPickCard == null) return false;
+            try
+            {
+                // The hand went to someone else (Root's Leftovers): this player's pick is over.
+                int picker = (int)F_pickrID.GetValue(choice);
+                if (picker != -1 && picker != currentSessionPlayer) return false;
+
+                var list = (List<GameObject>)F_spawnedCards.GetValue(choice);
+                if (list == null) return false;
+                foreach (var go in list)
+                    if (ReferenceEquals(go, endPickCard)) return true;
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// A pick is already committed or a hand is being dealt. Vanilla clears pickrID once you
+        /// pick; MorePicksPatch keeps it and sets isPlaying instead; the end-pick check covers
+        /// anything that does neither. A hand passed to another player is not ours to force,
+        /// which is how 0.3.36 treated it.
+        /// </summary>
+        private static bool PickInFlight(CardChoice choice)
+        {
+            try
+            {
+                int picker = (int)F_pickrID.GetValue(choice);
+                if (picker == -1) return true;
+                if (picker != currentSessionPlayer) return false;
+                if (SafeBool(F_isPlaying, choice)) return true;
+            }
+            catch { }
+            return EndPickInFlight(choice);
+        }
+
+        /// <summary>
+        /// PickInFlight for a session already 10s past its first expiry: by then only an end-pick
+        /// that is genuinely still running, or a cleared picker, rules out a forced pick.
+        /// </summary>
+        private static bool StuckPickInFlight(CardChoice choice)
+        {
+            try { if ((int)F_pickrID.GetValue(choice) == -1) return true; }
+            catch { }
+            return EndPickInFlight(choice);
         }
 
         internal static void WithNativeVisuals(Action a)
@@ -867,6 +1031,13 @@ namespace EveryonePicks
 
             bool wasBusy = localRunnerBusy;
             localRunnerBusy = false;
+
+            // Stand down anything the runner left nested and running, then send the report a
+            // finished session parked while its follow-up hooks ran. It goes before the queued
+            // ones below, which take their indices from it.
+            runGeneration++;
+            FollowUpPicks.Cancel();
+            SendPendingReport();
 
             var choice = CardChoice.instance;
             if (choice != null && (localPickActive || wasBusy))
@@ -999,6 +1170,8 @@ namespace EveryonePicks
             var applied = pendingApplySet ?? BuildApplySet();
             WaitingBanner.ForceHide();
             ApplySet(applied);
+            if (FollowUpPicks.HasGranters("PlayerPickEnd"))
+                yield return FollowUpPicks.DrainApplied(myToken);
 
             if (EveryonePicksPlugin.ShowReveal.Value)
             {
@@ -1028,6 +1201,7 @@ namespace EveryonePicks
             statuses.Clear();
             observedPicks.Clear();
             pendingApplySet = null;
+            FollowUpPicks.Cancel();
             phaseActive = false;
 
             try
@@ -1270,6 +1444,11 @@ namespace EveryonePicks
             seeded.Clear();
             currentSessionPicks.Clear();
             pendingApplySet = null;
+            pendingReport = null;
+            runGeneration++;
+            forcedPickLock = false;
+            endPickCard = null;
+            FollowUpPicks.Cancel();
 
             try
             {

@@ -1,9 +1,17 @@
-v0.3.37
+v0.3.38
 ---
 
 - Fixed nulled cards only existing on the screen of the player who picked one. Everyone now
   sees the card and the nulls it spent, so anti-cards and reforges count the same for the
   whole lobby.
+
+v0.3.37
+---
+
+- Fixed being able to grab a second card when the pick timer runs out.
+- Fixed a card slot getting stuck in the middle of the screen after that happened.
+- Cards that give you a follow-up pick from their own set (MFM's Blood Pact, Calibrate,
+  Immunize and the like) now give it straight away instead of next round.
 
 v0.3.36
 ---

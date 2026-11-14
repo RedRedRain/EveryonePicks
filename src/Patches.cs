@@ -7,6 +7,7 @@ using System.Reflection;
 using HarmonyLib;
 using Photon.Pun;
 using UnboundLib;
+using UnboundLib.GameModes;
 using UnityEngine;
 
 namespace EveryonePicks
@@ -31,6 +32,13 @@ namespace EveryonePicks
             // belt and braces against a third-party patch bouncing us back in here.
             if (State.startingOwnSession) return true;
 
+            // A follow-up the picker already took on their own machine; see DrainApplied.
+            if (FollowUpPicks.Draining && FollowUpPicks.InReplayStep)
+            {
+                __result = Noop();
+                return false;
+            }
+
             int picks = Mathf.Max(1, picksToSet);
 
             // A higher-priority prefix already cancelled this pick (PickNCards can set the count
@@ -42,8 +50,11 @@ namespace EveryonePicks
             }
 
             // This pick may already have been registered from the resolved pick order; only the
-            // surplus (extra picks granted by cards) is new.
-            int fresh = picks - State.ConsumeSeed(picketIDToSet, picks);
+            // surplus (extra picks granted by cards) is new. A follow-up granted from our own
+            // replay is always new: if the orchestrator has not reached this player yet, its seed
+            // belongs to the DoPick still to come, and spending it here would drop the follow-up
+            // to the back of the queue, after the pool its card set up had been used on another.
+            int fresh = FollowUpPicks.InReplayStep ? picks : picks - State.ConsumeSeed(picketIDToSet, picks);
             if (fresh > 0)
             {
                 var player = State.FindPlayer(picketIDToSet);
@@ -69,6 +80,53 @@ namespace EveryonePicks
         }
 
         private static IEnumerator Noop() { yield break; }
+    }
+
+    /// <summary>
+    /// Splits PlayerPickStart/PlayerPickEnd so cards that grant a follow-up pick act after the
+    /// pick, not before it. Untouched unless one of those mods is installed. See FollowUpPicks.
+    /// </summary>
+    [HarmonyPatch(typeof(GameModeManager), nameof(GameModeManager.TriggerHook), new[] { typeof(string) })]
+    internal static class Patch_TriggerHook_FollowUps
+    {
+        private static bool Prefix(string key, ref IEnumerator __result)
+        {
+            if (!FollowUpPicks.Intercept(key, out var replacement)) return true;
+            __result = replacement;
+            return false;
+        }
+    }
+
+    // ---------------------------------------------------------------- timed-out picks
+
+    /// <summary>Records which card each end-pick in a local session is for.</summary>
+    [HarmonyPatch(typeof(CardChoice), "RPCA_DoEndPick")]
+    internal static class Patch_DoEndPick_Note
+    {
+        private static void Postfix(int targetCardID)
+        {
+            if (!State.localPickActive) return;
+            try { State.NoteEndPick(PhotonNetwork.GetPhotonView(targetCardID)?.gameObject); }
+            catch { }
+        }
+    }
+
+    /// <summary>
+    /// After the timer picks for someone, ignore their input until that card has gone, which is
+    /// what vanilla's own pick does by clearing pickrID. Only after OUR pick: mods that keep a
+    /// hand open across several picks rely on input carrying on after a normal one.
+    /// </summary>
+    [HarmonyPatch(typeof(CardChoice), "DoPlayerSelect")]
+    internal static class Patch_DoPlayerSelect_ForcedLock
+    {
+        [HarmonyPriority(Priority.First)]
+        private static bool Prefix(CardChoice __instance)
+        {
+            if (!State.forcedPickLock) return true;
+            if (State.localPickActive && State.EndPickInFlight(__instance)) return false;
+            State.forcedPickLock = false;
+            return true;
+        }
     }
 
     /// <summary>
